@@ -11,3 +11,4 @@ class Config:
 
 
 PRODUCER_CONF = {'bootstrap.servers': '128.195.151.182:9392'}
+TOPIC_NAME = "test"

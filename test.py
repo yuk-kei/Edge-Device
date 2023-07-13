@@ -8,8 +8,10 @@ def test():
     sensor.set_sensor_data(sensor_data)
     print(sensor.dump_data())
 
+
 def test2():
     produce_data()
+
 
 if __name__ == "__main__":
     test2()
