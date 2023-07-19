@@ -1,0 +1,31 @@
+devices:
+- id: 00168972022167929bbecabd8344f9e9ad1dde716845df0000
+  ip_address: 0.0.0.0
+  location: lab
+  name: test sensor 1
+  port: 3000
+  type: normal sensor
+#- id: 0016897202217063c8b4088c29a4dd1959ed8a0eabc9e4f000
+#  ip_address: 0.0.0.0
+#  location: office
+#  name: test sensor 2
+#  port: 4000
+#  type: temperature sensor
+#- id: 001689720221724991051f7b77849b7b2c3686e1f58dba1000
+#  ip_address: 0.0.0.0
+#  location: basement
+#  name: test sensor 3
+#  port: 5000
+#  type: humidity sensor
+#- id: 001689720221762c8038f4072af4a41afb5db9367709880000
+#  ip_address: 0.0.0.0
+#  location: hallway
+#  name: test sensor 4
+#  port: 6000
+#  type: pressure sensor
+#- id: 001689720221786f88971a0d46449bd9e9daf2a07b58ec5000
+#  ip_address: 0.0.0.0
+#  location: lab2
+#  name: test sensor 5
+#  port: 7000
+#  type: light sensor

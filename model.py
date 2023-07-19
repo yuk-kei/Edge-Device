@@ -1,12 +1,13 @@
 import json
 import logging
-import os
 import threading
 from dataclasses import dataclass
+from time import sleep
 
 import requests
 from confluent_kafka import Producer, KafkaError
 
+import config
 from config import PRODUCER_CONF
 
 logger = logging.getLogger("Device Producer: ")
@@ -18,7 +19,7 @@ class SensorData:
     values: dict[str, int]
 
 
-from sensorutils import generate_mock_values, gen_ts_data
+from data_gen import generate_mock_values, gen_ts_data, gen_mock_temperature
 
 
 class Sensor:
@@ -54,14 +55,15 @@ class Device(threading.Thread):
         self.port = port
         self.sleep_time = sleep_time
         self.producer = Producer(PRODUCER_CONF)
-        self._stop_event = threading.Event()
-        self._pause_event = threading.Event()
+        self._stop_event = threading.Event()  # flag to stop the thread
+        self._pause_event = threading.Event()  # flag to pause the thread
+        self._pause_event.set()  # Set to True
         self.name = name
         self.device_id = device_id
         self.type = type
         self.location = location
         self.status = status
-        self.rate = 0.1
+        self.rate = 1
         self.topic_name = "test"
 
     def emit_data(self, mode="mock", ts_data=None):
@@ -79,6 +81,7 @@ class Device(threading.Thread):
                 key=key,
                 value=message,
             )
+            print(f"Sent data: {message}")
         except KafkaError as e:
             logger.error(f"Kafka error: {e}")
 
@@ -99,40 +102,75 @@ class Device(threading.Thread):
             "values": ts_data.values
         }
 
-    def run(self):
-        # if self.device_id is None:
-        #     self.register()
-
+    def register(self):
         try:
-            while not self._stop_event.is_set() and not self._pause_event.is_set():
-                self.emit_data()
+            response = requests.post(url=config.REGISTRATOR_URL,
+                                     json={"device_id": self.device_id, "name": self.name, "type": self.type,
+                                           "location": self.location, "status": self.status, "ip_address": self.ip,
+                                           "port": self.port})
+            if 200 <= response.status_code < 300:
+                data = response.json()
+                self.device_id = data.get("device_id")
+                logger.info(f"Device registered with id: {self.device_id}")
+            else:
+                print(response.status_code)
+                logger.error(f"Error registering device: {response.status_code}")
+        except Exception as e:
+            print(e)
+            logger.error(f"Error registering device: {e}")
+
+    def change_sampling_rate(self, rate):
+        self.rate = rate
+
+    def run(self):
+        if self.device_id is None:
+            self.register()
+        self.status = "running"
+        message_count = 0
+        try:
+            while not self._stop_event.is_set():  # check stop flag before sending data
+                self.emit_data()  # add real data here
+                message_count += 1
+                print(f"Sent {message_count} messages")
                 self.flush()
-                self._pause_event.wait(self.rate)
+                sleep(self.rate)
+                self._pause_event.wait()  # wait until resume is called
         except Exception as e:
             logger.error(f"Error: {e}")
         finally:
             self._stop_event.set()
 
-    def register(self):
-        url = os.environ.get("REGISTRATOR_URL")
-        try:
-            response = requests.post(url, json={"device_id": self.device_id, "name": self.name, "type": self.type,
-                                                "location": self.location, "status": self.status, "ip_address": self.ip,
-                                                "port": self.port})
-            if response.status_code == 200:  # Assuming a successful response with status code 200
-                data = response.json()
-                self.device_id = data.get("device_id")
-                logger.info(f"Device registered with id: {self.device_id}")
-            else:
-                logger.error(f"Error registering device: {response.status_code}")
-        except Exception as e:
-            print(e)
+    def pause(self):
+        self._pause_event.clear()
+        self.status = "paused"
+
+    def resume(self):
+        self._pause_event.set()
+        self.status = "running"
 
     def stop(self):
         self._stop_event.set()
+        self.status = "stopped"
 
-    def pause(self):
-        self._pause_event.set()
 
-    def resume(self):
-        self._pause_event.clear()
+class Thermometer(Device):
+    def set_range(self, min, max):
+        self.min = min
+        self.max = max
+
+    def emit_data(self, mode="mock", ts_data=None):
+        if ts_data is None and mode == "mock":
+            mock_data = gen_mock_temperature()
+            ts_data = gen_ts_data(mock_data)
+        key = self.name
+        message = json.dumps(self.dump_to_infuxdb(ts_data)).encode('utf-8')
+
+        try:
+            self.producer.produce(
+                self.topic_name,
+                key=key,
+                value=message,
+            )
+            print(f"Sent data: {message}")
+        except KafkaError as e:
+            logger.error(f"Kafka error: {e}")
