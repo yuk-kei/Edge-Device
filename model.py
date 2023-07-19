@@ -8,7 +8,7 @@ import requests
 from confluent_kafka import Producer, KafkaError
 
 import config
-from config import PRODUCER_CONF
+from config import PRODUCER_CONF,TOPIC_NAME
 
 logger = logging.getLogger("Device Producer: ")
 
@@ -19,33 +19,7 @@ class SensorData:
     values: dict[str, int]
 
 
-from data_gen import generate_mock_values, gen_ts_data, gen_mock_temperature
-
-
-class Sensor:
-    def __init__(self, name, sensor_id):
-        self.name = name
-        self.sensor_id = sensor_id
-        self.tags = {
-            "owner": "Calit2",
-            "machine_id": "None",
-        }
-        self.data = None
-
-    def set_sensor_data(self, data: SensorData):
-        self.data = data
-
-    def set_tags(self, tags):
-        self.tags = tags
-
-    def dump_data(self):
-        return {
-            "sensor_name": self.name,
-            "sensor_id": self.sensor_id,
-            "tags": self.tags,
-            "time": self.data.timestamp,
-            "fields": self.data.values
-        }
+from data_gen import generate_mock_values, gen_ts_data, gen_accelerometer_data
 
 
 class Device(threading.Thread):
@@ -64,13 +38,14 @@ class Device(threading.Thread):
         self.location = location
         self.status = status
         self.rate = 1
-        self.topic_name = "test"
+        self.topic_name = TOPIC_NAME
 
-    def emit_data(self, mode="mock", ts_data=None):
+    def emit_data(self):
 
-        if ts_data is None and mode == "mock":
-            mock_data = generate_mock_values()
-            ts_data = gen_ts_data(mock_data)
+        # TODO: Overide this method to add real data here
+        mock_data = generate_mock_values()
+        ts_data = gen_ts_data(mock_data)
+
 
         key = self.name
         message = json.dumps(self.dump_to_infuxdb(ts_data)).encode('utf-8')
@@ -153,15 +128,11 @@ class Device(threading.Thread):
         self.status = "stopped"
 
 
-class Thermometer(Device):
-    def set_range(self, min, max):
-        self.min = min
-        self.max = max
+class Accelerometer(Device):
 
-    def emit_data(self, mode="mock", ts_data=None):
-        if ts_data is None and mode == "mock":
-            mock_data = gen_mock_temperature()
-            ts_data = gen_ts_data(mock_data)
+    def emit_data(self):
+        acc_data = gen_accelerometer_data
+        ts_data = gen_ts_data(acc_data)
         key = self.name
         message = json.dumps(self.dump_to_infuxdb(ts_data)).encode('utf-8')
 

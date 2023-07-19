@@ -1,16 +1,28 @@
 import random
 from datetime import datetime, timezone
+from adafruit_lsm6ds.ism330dhcx import ISM330DHCX
+from adafruit_lsm6ds import Rate
 
 from model import SensorData
 
+# print(qwiic.list_devices())
+i2c = board.I2C()  # uses board.SCL and board.SDA
+# i2c = board.STEMMA_I2C()  # For using the built-in STEMMA QT connector on a microcontroller
+sensor = ISM330DHCX(i2c, 0x6b)
+sensor.accelerometer_data_rate = Rate.RATE_833_HZ
 
-def generate_mock_values() -> dict[str, int]:
-    """
-    Generates a list of value arrays for every minute of the current date.
-    """
+
+def gen_accelerometer_data():
+    data1 = sensor.acceleration
+    data2 = sensor.gyro
+
     return {
-        "value_a": random.randint(60, 90),
-        "value_b": random.randint(70, 120),
+        "acc_x": data1[0],
+        "acc_y": data1[1],
+        "acc_z": data1[2],
+        "gyro_x": data2[0],
+        "gyro_y": data2[1],
+        "gyro_z": data2[2],
     }
 
 
@@ -27,24 +39,11 @@ def gen_mock_temperature():
     }
 
 
-def gen_timestamps() -> str:
+def generate_mock_values() -> dict[str, int]:
     """
-    Generates a list of timestamps for every minute of the current date.
-
-    Returns:
-        list: Unix epoch formatted timestamps for every minute of the current date.
+    Generates a list of value arrays for every minute of the current date.
     """
-    month = datetime.now().month
-    day = datetime.now().day
-    year = datetime.now().year
-    hour = datetime.now().hour
-    minute = datetime.now().minute
-    second = datetime.now().second
-    microsecond = datetime.now().microsecond
-    current_time_str = str(year) + "-" + str(month) + "-" + str(day) + " " + str(hour) + ":" + str(minute) + ":" + str(
-        second) + "." + str(microsecond)
-    # current_time = datetime.strptime(current_time_str, "%Y-%m-%d %H:%M:%S.%f")
-    # current_time_str_in_ms = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
-    # timestamp_unix = int(datetime.strptime(current_time_str_in_ms, "%Y-%m-%d %H:%M:%S.%f").timestamp() * 1000)
-
-    return current_time_str
+    return {
+        "value_a": random.randint(60, 90),
+        "value_b": random.randint(70, 120),
+    }
