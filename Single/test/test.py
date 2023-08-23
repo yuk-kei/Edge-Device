@@ -1,6 +1,4 @@
-import yaml
-
-from model import Device
+from Single.app.model import Device
 
 device = Device("Device 1", "localhost", 9001, type="sensor", location="calit2", status="active")
 

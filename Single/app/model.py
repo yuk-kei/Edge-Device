@@ -7,8 +7,8 @@ from time import sleep
 import requests
 from confluent_kafka import Producer, KafkaError
 
-import config
-from config import PRODUCER_CONF,TOPIC_NAME
+from Single import config
+from Single.config import PRODUCER_CONF, TOPIC_NAME
 
 logger = logging.getLogger("Device Producer: ")
 
@@ -19,33 +19,35 @@ class SensorData:
     values: dict[str, int]
 
 
-from data_gen import generate_mock_values, gen_ts_data, gen_accelerometer_data
+from .data_gen import generate_mock_values, gen_ts_data  # , gen_accelerometer_data
 
 
 class Device(threading.Thread):
-    def __init__(self, name, ip, port, device_id=None, type=None, location=None, status=None, sleep_time=5):
+    def __init__(self, name, ip, port, device_id=None, type=None, category=None, location=None, status=None,
+                 data_source=None, rate=1):
         threading.Thread.__init__(self)
         self.ip = ip
         self.port = port
-        self.sleep_time = sleep_time
         self.producer = Producer(PRODUCER_CONF)
         self._stop_event = threading.Event()  # flag to stop the thread
         self._pause_event = threading.Event()  # flag to pause the thread
         self._pause_event.set()  # Set to True
         self.name = name
+        self.category = category
         self.device_id = device_id
         self.type = type
         self.location = location
         self.status = status
-        self.rate = 1
+        self.rate = rate
         self.topic_name = TOPIC_NAME
+        self.data_source = generate_mock_values() if data_source is None else data_source
 
     def emit_data(self):
 
         # TODO: Overide this method to add real data here
-        mock_data = generate_mock_values()
-        ts_data = gen_ts_data(mock_data)
+        mock_data = self.data_source
 
+        ts_data = gen_ts_data(mock_data)
 
         key = self.name
         message = json.dumps(self.dump_to_infuxdb(ts_data)).encode('utf-8')
@@ -54,25 +56,33 @@ class Device(threading.Thread):
             self.producer.produce(
                 self.topic_name,
                 key=key,
+
                 value=message,
+                callback=self.delivery_report
             )
             print(f"Sent data: {message}")
         except KafkaError as e:
             logger.error(f"Kafka error: {e}")
 
+    def delivery_report(self, err, msg):
+        if err:
+            print('ERROR: Message failed delivery: {}'.format(err))
+        else:
+            print("Produced event to topic {topic}: key = {key:12} value = {value:12}".format(
+                topic=msg.topic(), key=msg.key().decode('utf-8'), value=msg.value().decode('utf-8')))
+            pass
+
     def flush(self):
         self.producer.flush()
 
+    def poll(self):
+        self.producer.poll(0)
+
     def dump_to_infuxdb(self, ts_data):
 
-        info = {
-            "type": self.type,
-            "id": self.device_id,
-            "status": self.status,
-        }
         return {
             "device_name": self.name,
-            "info": info,
+            "id": self.device_id,
             "time": ts_data.timestamp,
             "values": ts_data.values
         }
@@ -82,7 +92,7 @@ class Device(threading.Thread):
             response = requests.post(url=config.REGISTRATOR_URL,
                                      json={"device_id": self.device_id, "name": self.name, "type": self.type,
                                            "location": self.location, "status": self.status, "ip_address": self.ip,
-                                           "port": self.port})
+                                           "category": self.category, "port": self.port})
             if 200 <= response.status_code < 300:
                 data = response.json()
                 self.device_id = data.get("device_id")
@@ -107,7 +117,8 @@ class Device(threading.Thread):
                 self.emit_data()  # add real data here
                 message_count += 1
                 print(f"Sent {message_count} messages")
-                self.flush()
+                # self.flush()
+                self.poll()
                 sleep(self.rate)
                 self._pause_event.wait()  # wait until resume is called
         except Exception as e:
@@ -125,23 +136,34 @@ class Device(threading.Thread):
 
     def stop(self):
         self._stop_event.set()
+        sleep(1)
         self.status = "stopped"
+        self.flush()
+        self.join()
+
+
+"""------------Different types of devices------------"""
 
 
 class Accelerometer(Device):
 
-    def emit_data(self):
-        acc_data = gen_accelerometer_data
-        ts_data = gen_ts_data(acc_data)
-        key = self.name
-        message = json.dumps(self.dump_to_infuxdb(ts_data)).encode('utf-8')
+    def __init__(self, name, ip, port, device_id=None, type=None, category=None, location=None, status=None,
+                 data_source=None, rate=1):
+        super().__init__(name, ip, port, device_id, type, category, location, status, data_source, rate)
+        # self.data_source = gen_accelerometer_data
 
-        try:
-            self.producer.produce(
-                self.topic_name,
-                key=key,
-                value=message,
-            )
-            print(f"Sent data: {message}")
-        except KafkaError as e:
-            logger.error(f"Kafka error: {e}")
+    # def emit_data(self):
+    #     acc_data = gen_accelerometer_data
+    #     ts_data = gen_ts_data(acc_data)
+    #     key = self.name
+    #     message = json.dumps(self.dump_to_infuxdb(ts_data)).encode('utf-8')
+    #
+    #     try:
+    #         self.producer.produce(
+    #             self.topic_name,
+    #             key=key,
+    #             value=message,
+    #         )
+    #         print(f"Sent data: {message}")
+    #     except KafkaError as e:
+    #         logger.error(f"Kafka error: {e}")
