@@ -40,12 +40,14 @@ class Device(threading.Thread):
         self.status = status
         self.rate = rate
         self.topic_name = TOPIC_NAME
-        self.data_source = generate_mock_values() if data_source is None else data_source
+
+    def data_source(self):
+        return generate_mock_values()
 
     def emit_data(self):
 
         # TODO: Overide this method to add real data here
-        mock_data = self.data_source
+        mock_data = self.data_source()
 
         ts_data = gen_ts_data(mock_data)
 
@@ -147,10 +149,8 @@ class Device(threading.Thread):
 
 class Accelerometer(Device):
 
-    def __init__(self, name, ip, port, device_id=None, type=None, category=None, location=None, status=None,
-                 data_source=None, rate=1):
-        super().__init__(name, ip, port, device_id, type, category, location, status, data_source, rate)
-        # self.data_source = gen_accelerometer_data
+    def data_source(self):
+        pass
 
     # def emit_data(self):
     #     acc_data = gen_accelerometer_data
