@@ -7,8 +7,8 @@ from time import sleep
 import requests
 from confluent_kafka import Producer, KafkaError
 
-from Single import config
-from Single.config import PRODUCER_CONF, TOPIC_NAME
+from Single.app import config
+from Single.app.config import PRODUCER_CONF, TOPIC_NAME
 
 logger = logging.getLogger("Device Producer: ")
 

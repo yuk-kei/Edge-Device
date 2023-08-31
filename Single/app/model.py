@@ -7,8 +7,7 @@ from time import sleep
 import requests
 from confluent_kafka import Producer, KafkaError
 
-from Single import config
-from Single.config import PRODUCER_CONF, TOPIC_NAME
+from .config import PRODUCER_CONF, TOPIC_NAME, REGISTRATOR_URL
 
 logger = logging.getLogger("Device Producer: ")
 
@@ -51,13 +50,13 @@ class Device(threading.Thread):
 
         ts_data = gen_ts_data(mock_data)
 
-        key = self.name
+        # key = self.name
         message = json.dumps(self.dump_to_infuxdb(ts_data)).encode('utf-8')
 
         try:
             self.producer.produce(
                 self.topic_name,
-                key=key,
+                # key=key,
 
                 value=message,
                 callback=self.delivery_report
@@ -70,8 +69,10 @@ class Device(threading.Thread):
         if err:
             print('ERROR: Message failed delivery: {}'.format(err))
         else:
-            print("Produced event to topic {topic}: key = {key:12} value = {value:12}".format(
-                topic=msg.topic(), key=msg.key().decode('utf-8'), value=msg.value().decode('utf-8')))
+            # print("Produced event to topic {topic}: key = {key:12} value = {value:12}".format(
+                # topic=msg.topic(), key=msg.key().decode('utf-8'), value=msg.value().decode('utf-8')))
+            print("Produced event to topic {topic}: value = {value:12}".format(
+                topic=msg.topic(),value=msg.value().decode('utf-8')))
             pass
 
     def flush(self):
@@ -91,7 +92,7 @@ class Device(threading.Thread):
 
     def register(self):
         try:
-            response = requests.post(url=config.REGISTRATOR_URL,
+            response = requests.post(url=REGISTRATOR_URL,
                                      json={"device_id": self.device_id, "name": self.name, "type": self.type,
                                            "location": self.location, "status": self.status, "ip_address": self.ip,
                                            "category": self.category, "port": self.port})
@@ -118,7 +119,6 @@ class Device(threading.Thread):
             while not self._stop_event.is_set():  # check stop flag before sending data
                 self.emit_data()  # add real data here
                 message_count += 1
-                print(f"Sent {message_count} messages")
                 # self.flush()
                 self.poll()
                 sleep(self.rate)
