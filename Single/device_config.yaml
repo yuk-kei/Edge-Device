@@ -1,8 +1,0 @@
-device:
-  category: sensor
-  id: 1692816547f41f2966
-  ip_address: localhost
-  location: lab
-  name: test-sensor
-  port: 5000
-  type: pressure sensor
